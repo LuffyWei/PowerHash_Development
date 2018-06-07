@@ -1,0 +1,16 @@
+5.0版本相较与powerhash又近了一步，作了两点改进：1.采用精确group size生成输出索引，输出的groupBy结果文件中没有空隙。算法中count-min的统计结果
+                                            不再作为生成输出索引的精确size，只是作为分辨big group和small group的工具。
+                                          2.将小组根据accumulate输出offset也写入结果文件，虽然仍然没有进行groupBy，但是为后来的想法提供
+                                            了思路。
+
+5.0版本中small group仍然是无序的，只是集中在一块输出。
+如何统计精确的group size呢，仍然是借用中间文件key_file，不过key_file不再只是记录<key>，而是记录每个kv-pair对应的<key, valuesize>，由于
+valuesize是整型，key我们仍然沿用4.0的32位整型， 格式固定，所以仍然可以使用二进制读写。
+
+
+5.0版本的算法思路如下： 1. 遍历原始文件，利用count-min统计每个组的rough group size。 同时将原始文件中的<key, value>转化为<key, valuesize>
+                        的格式以二进制的方式输出到中间结果key_file中。
+                     2. 遍历key_file，根据group size阈值和count-min统计的rough size获取big group的精确size。然后将big group的精确
+                        size转化为输出索引。每个子文件的结尾的offset记作accumulate offset,用来输出small group中的kv-pair.
+                     3. 根据输出索引，将big group输出至结果文件，同时无序的small group根据accumulate offset附加在每个接过文件的尾部。
+
