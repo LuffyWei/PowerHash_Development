@@ -1,0 +1,44 @@
+//
+// Created by weixun on 11/26/17.
+//
+
+#ifndef BHASHTEST1_0_COUNTMIN_H
+#define BHASHTEST1_0_COUNTMIN_H
+
+#include <string>
+#include "KeyBuffer.h"
+#include "KVBuffer.h"
+
+using namespace std;
+
+class CountMin{
+public:
+    //count-min ²ÎÊý
+    int count_min_num;
+    uint64_t  count_min_length;
+    uint64_t ** count_min_arrays;
+    uint64_t * a;
+    uint64_t * b;
+    uint64_t p;
+    //key buffer
+    KeyBuffer *keyBuffer;
+    //kv buffer
+    uint64_t sub_file_num;
+    uint64_t bucket_num;
+    KVBuffer *kvBuffer;
+
+    CountMin(int count_min_num, uint64_t count_min_length, uint64_t sub_file_num, uint64_t bucket_num,
+             int key_buffer_num, int groupBy_buffer_kvnum);
+
+    int add_key_fillSpill(string base_path, string k, string v, char kv_split);
+    int get_file_id(uint64_t murmur_id);
+    uint64_t get_frequency(string k, const unsigned int seed);
+    int count_min_hash(uint64_t murmur_id, int index);
+    int flush_reminder_kvBuffer(string base_path, char split_kv);
+    int flush_reminder_keyBuffer(string base_path);
+    ~CountMin();
+
+
+
+};
+#endif //BHASHTEST1_0_COUNTMIN_H

@@ -1,0 +1,11 @@
+这个是bHash的2.0版本，初次引入count-min sketch.
+2.0版本分三步： 1. 遍历原始文件，通过count-min统计每个group的rough size, 同时生成记录<key, valuesize>的中间文件key_file。
+              2. 遍历key_file，将存储在count-min sketch中的rough size转移到hash表中， 然后生成输出索引。
+              3. 遍历原始文件，通过输出索引将kv-pair输出到结果文件中。
+
+bHash 1.0版本中， 建立输出索引前，需要计算每个group的精确size， 2.0版本采用的方法是：利用count-min sketch统计的每个group的 rough size 当作精确size，提高计算
+速度，从而更快速的生成输出索引。
+这种方法实际需要遍历原始数据集三次，但是我们在第一步利用count-min统计size时，生成一个记录<key>的中间文件key_file，在第二步生成输出索引时就无需遍历原始
+文件，只需遍历这个中间文件key_file。这里的key_file的读出和写入都是一行一行的，速度慢，在4.0版本，它的读出和写入将采用二进制快读写。
+
+算法问题： 算法最大的问题就是输出结果不是连续的，通过count-min获取的rough size几乎都比实际精确size偏大，所以输出文件中有很多空隙，仍待改进。
