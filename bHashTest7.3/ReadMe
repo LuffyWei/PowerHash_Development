@@ -1,0 +1,10 @@
+7.2版本的算法思想和6.0版本一样：1. 遍历原始文件，利用count-min统计每个组的rough group size。 同时将原始文件中的<key, value>转化为<key, valuesize>
+                               的格式以二进制的方式输出到中间结果key_file中。
+                            2. 遍历key_file，根据group size阈值和count-min统计的rough size获取big group的精确size。然后将big group的精确
+                               size转化为输出索引。 同时人为设定accumulate单元个数，对small group进行hash分组，采用和big group一样的累计方式，
+                               计算每个accumulate单元的大小，再采用和big group一样的转化方式，将每个单元大小转化为accumulate offset,用来输出
+                               small group中的kv-pair.
+                            3. 根据输出索引，将big group输出至结果文件，同时无序的small group根据accumulate offset附加在每个接过文件的尾部。
+
+7.3版本仍然是对key_file二进制读写的改进，这一版本构造的key结构体是<char[], int>类型，其中char[]数组是根据最长key来选定的，这样就可以保证
+<key,valuesize>可以通过二进制无损的读出和写入，适用于所有数据集。
