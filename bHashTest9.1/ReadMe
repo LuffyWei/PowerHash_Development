@@ -1,0 +1,3 @@
+9.1是9.0版本的对照版本，版本9.0首先计算B，9.1版本首先计算P,计算P时一定要选取小根。
+由于9.0版本中，最终计算会导致B偏大，也就会导致很多small group也会被当作small group， P偏小， 对big group的groupBy效率降低，对small group的内存估计不足从而导致每个partition被处理时
+都占用很多内存，所以添加了一个beta参数用来调整ratio.
