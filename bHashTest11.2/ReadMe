@@ -1,0 +1,22 @@
+由于根据9.0版本的设置参数的方式，内存越大，算法就会蜕变成为一个indexing-filling算法，这不符合要求。按理说应该是内存越大，越多的kv-pair会被读入内存进行hash grouping。
+所以放弃了9.0版本的参数设置方法，于是衍生出11.2版本:人为设置big group和small group比例。
+
+这个版本是认为设置big group和small group的比例，而且原始文件不划分成多个spill子文件。
+算法思想和8.0版本一样。
+
+11.2版本几乎完全接近powerhash，不过这个时候推理有点小错误。
+
+假设big group和small group的比例ratio是alpha, 数据集中总的group数目为T， 数据集中kv-pair数目为N， 数据集总大小为M
+每个kv-pair的平均大小是： M/N
+每个group中的平均kv-pair数目是： N/T
+那么big group num = T*alpha，
+
+由于在划分small group时需要用到small group的总大小，而且根据9.0版本的计算方式，那么small group的总大小我们是这么表示的： (M/N)*(N/T)*T(1-alpha) = M*(1-alpha)
+这个是不符合实际情况的，如果针对服从power-law分布的数据集，small group约占总组数的80%，但small group的总大小只占20%左右。
+所以这里推理有点错误,问题就处在每个small group中的kv-pair远没有(N/T),这将small group的总大小拔高了不少。
+不过这种反馈的过程就引入了刚才我们所说的pareto principle（20/80 rule）,最终提出powerhash.
+
+实现过程中设置的参数beta，是accumulate_num的扩大因子，因为理论计算的accumulate_num总是比实际小，所以稍微扩大一下，以免出现out-of-memory现象。即使这个beta设置的较大
+也没有关系，因为我们只是担心内存不足问题，所以越大就代表partition的数目越多，每个partition就越小，越不会发生内存溢出问题。 而且，在partition数目相差不是特别大的时候，
+small group 的groupBy时间几乎没有区别。
+
