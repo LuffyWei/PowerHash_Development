@@ -1,0 +1,1 @@
+8.0版本的测试版本，small group没有进行groupBy，只是写入了各个partitions。
