@@ -1,0 +1,5 @@
+11.0版本相对9.0版本，作了工程上的改进：尝试不分spill，每次都是直接遍历整个文件。
+这样bucket num这个参数就不需要人为给出， 可以通过计算得出B(big group num)。该版本除了必要的available memory之外，只需设置参数alpha(小组数目S和小组
+中kv-pair的数目的比例)。至于其他的buffer的数目不作为讨论目标。
+
+结果：实验结果与分spill结果差不多，所以在最终的powerhash中，都是不分spill的。不过划分spill仍可以作为一个编程技巧。
