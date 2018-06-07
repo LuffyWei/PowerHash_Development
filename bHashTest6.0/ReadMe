@@ -1,0 +1,14 @@
+6.0版本相较于5.0版本，距离powerhash又近了一步，引入了small group分区的概念，也就是small groups虽然是根据accumulate offset写入结果文件，不过人为设定
+每个子文件中accumulate单元的个数，这个想法的来源是防止small group无序集合过大，在后续aggregate操作中造成内存溢出的错误。其中accumulate单元的个数是人为
+设定的，有一定的局限性。
+
+算法思路与5.0大体一样：1. 遍历原始文件，利用count-min统计每个组的rough group size。 同时将原始文件中的<key, value>转化为<key, valuesize>
+                   的格式以二进制的方式输出到中间结果key_file中。
+                2. 遍历key_file，根据group size阈值和count-min统计的rough size获取big group的精确size。然后将big group的精确
+                   size转化为输出索引。 同时人为设定accumulate单元个数，对small group进行hash分组，采用和big group一样的累计方式，
+                   计算每个accumulate单元的大小，再采用和big group一样的转化方式，将每个单元大小转化为accumulate offset,用来输出
+                   small group中的kv-pair.
+                3. 根据输出索引，将big group输出至结果文件，同时无序的small group根据accumulate offset附加在每个接过文件的尾部。
+
+算法问题：key_file仍然是只适用于key是整型的数据集。
+        除了引入size阈值这一参数以外，又引入accumulate分区个数这个参数，算法局限性增大。
