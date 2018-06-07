@@ -1,0 +1,29 @@
+经过前8个版本的改进，算法可以完成groupBy任务，但是参数设置需要认为参与，我们寄希望根据现有的available memory计算出所有关键参数，比如size阈值可以自动获取等等。
+所以9.0版本以及之后的所有工作都是围绕如何快速准确的自动选取参数进行的，算法的主题思想仍停留在版本8.0上面。
+
+假设大组数目为B， 小组数目为S， 划分小组之后的partition num为P, 这些是希望求得的参数
+可以获取的参数是总的group数目T; 平均的kv-piar大小为fixed_size; 如果输出索引是hash table, hash table每一条记录的大小是offset_size；
+另外，由于small group之所以被称为small group， 就是因为group中kv-pair少，可以假设每个small group中kv-pair数目为a(alpha)。如果small group中总的kv-pair数目为S',则有
+            a*S = S'
+如果此时可用内存是M，为了防止生成的输出索引过大，就会有如下约束条件，其中输出索引的大小为：offset_size * B, 每个partition构成的索引的总大小为：offset_size * P,则有
+            offset_size*B + offset_size*P <= M
+在big group处理完成之后，输出索引所占用内存被释放，内存只用来处理每个small group partition, 那么每个partition在利用hash grouping方法处理时，生成的hash table不能超过内存，
+假设每个partition都是均分所得， 那么每个partition中的small group数目为：S/P， 每个partition中的kv-pair数目为：(a*S)/P, 则有如下约束条件：
+            offset_size*P + (S/P)*offset_size + (a*S)/P*fixed_size <= M
+最后，根据hyperloglog算法，在第一次遍历整个数据集时可以计算出总的group数目T
+            B + S = T
+那么根据上面四个公式， 则可以计算出B的上限，P的下限制，以及对应的S。那么就可以求出能够适应当前内存的big group和small group的比例ratio。
+这时，我们在对count-min sketch的某一行排序，根据这个比例ratio，计算出区分big group和small group的阈值，进而区分big group和small group。
+
+在实际程序中，考虑到我们的hash table使用的是拉链法以及相应的冲突率,假设拉链的baseNode是实际的索引数目的4/3倍，而且在公式2中，还将count-min sketch的大小计算在内。
+
+这种计算方式可以为整个算法计算出一个ratio上上限，防止生成的输出索引offset index超出内存，因为offset index一旦超过内存，程序就死了。
+
+这个如果只是当作上限计算还好，一旦当作B，S，P的准确计算方式(<= 改成=)，那么M的轻微变化都会导致offset index巨大变化，而且内存充足时，整个算法就退化成了indexing-filling方法。
+之所以会出现这种情况，是因为我们将indexing-filling当作grouping的首选方法，希望内存越大时offset index也越大，这是这种设计方案的思维漏洞。由于在内存充足的情况下，
+indexing and filling方法肯定没有基于内存的hash grouping快，所以算法效率就大大降低了。
+
+最终就会导致B偏大，也就会导致很多small group也会被当作small group， P偏小， 对big group的groupBy效率降低，对small group的内存估计不足从而导致每个partition被处理时都占用
+很多内存。所以添加了一个beta参数用来调整ratio.
+
+
