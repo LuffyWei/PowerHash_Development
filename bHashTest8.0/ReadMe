@@ -1,0 +1,22 @@
+通过2.0版本引入count-min sketch对group size进行粗略统计
+通过3.0版本引入big group和small group的单独处理的思想，但是只是处理big group，small group不作处理
+通过4.0版本引入key_file的二进制块读出和写入的工程思想。
+通过5.0版本引入：还是通过精确group size生成输出索引更合适的想法，key_file记录<key, valuesize>。
+               同时，引入将small group统一写入accumulate单元，但是仍然不作处理。
+通过6.0版本引入：将accumulate单元分区的思想，也就是对small groups进行分区的思想，但是small group仍然不作处理。
+通过7.3版本引入适用于所有数据集的key_file二进制读写方法，即key结构体设置为<char[], int>类型。
+
+上面每一步都是一步步向powerhash接近，但是small group都是以无序状态写入结果文件，都没有作处理。8.0版本就是将small group根据6.0版本的分区，将每个partition逐个读入内存，在内存中进行
+hash groupBy操作，再将group完成的small groups写入结果文件，这样，得到的结果中，不论是big groups还是small groups都是正确结果，不存在无序的结果。
+
+8.0版本除了参数的确定需要认为参与意外，整个算法几乎就是powerhash。整个算法流程如下：
+   1.遍历原始文件，通过count-min sketch粗略统计每个group的 rough size,同时生成记录<key, valuesize>的中间文件key_file。
+   2.遍历key_file, 通过key_file中的key从count-min sketch中获取rough size， 然后通过阈值判断是否是big group，如果是，在建立索引，累加valuesize和keysize获取精确 group size；
+     如果是small group，则直接通过hash分区的方式累加到对应的accumulate partition，获取每个parititon的size。
+     然后，通过big group size和partition size转化得到对应的offset index。
+   3.遍历原始文件，通过<key，value>中的key查找 offset index, 如果有对应key， 则属于big group，将其根据offset写入对应位置。如果没有key, 则属于small group, 将其通过hash方式写入
+     对应的partition. 遍历完成之后，big group以完成groupBy, small group仍然无序，这个时候再将partition逐个读入内存，利用hash groupBy方式进行group, 完成之后将结果输出到结果文件。
+
+
+问题： 整个过程中，结果可以保证是正确的，但是人为设置参数过多，包括count-min的长度、宽度，big group和small group的阈值，small groups的partition数目。还有其它的buffer size的参数。这些
+人为参数过多，影响了算法的拓展性。
